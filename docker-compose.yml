@@ -1,0 +1,51 @@
+services:
+
+  db:
+    image: postgres:17
+    container_name: karako_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: karako
+      POSTGRES_USER: karako
+      POSTGRES_PASSWORD: karako_dev_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  backend:
+    build:
+      context: ./backend
+    container_name: karako_backend
+    restart: unless-stopped
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_NAME: karako
+      DATABASE_USER: karako
+      DATABASE_PASSWORD: karako_dev_password
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: karako_frontend
+    restart: unless-stopped
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3000:3000"
+    command: npm run dev
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
