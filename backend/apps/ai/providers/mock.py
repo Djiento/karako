@@ -70,21 +70,33 @@ class MockAIProvider(AIProvider):
             ),
         }
 
-    def summarize(self, content: str) -> dict[str, Any]:
+    def summarize(
+        self,
+        *,
+        content: str,
+    ) -> dict[str, Any]:
 
         return {
             "summary": (
-                "Résumé généré par le fournisseur IA de développement."
+                "L'idée présente une problématique qui pourrait "
+                "être résolue par une solution numérique. "
+                "Les informations disponibles permettent de "
+                "commencer à cadrer le problème, mais plusieurs "
+                "éléments doivent encore être validés."
             ),
             "known": [
-                "Les informations fournies ont été prises en compte."
+                "Une problématique a été identifiée.",
+                "Une solution potentielle a été formulée.",
+                "Une cible initiale a été définie.",
             ],
             "unknown": [
-                "Des informations complémentaires sont nécessaires."
+                "Le niveau réel de douleur du problème.",
+                "La volonté des utilisateurs de payer.",
+                "Les solutions actuellement utilisées.",
             ],
             "contradictions": [],
             "next_action": (
-                "Collecter davantage d'informations avant de prendre "
-                "une décision définitive."
+                "Réaliser des entretiens avec des utilisateurs "
+                "de la cible."
             ),
         }

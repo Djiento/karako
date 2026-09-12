@@ -5,8 +5,11 @@ from rest_framework.views import APIView
 from apps.validation.models import Hypothesis
 from apps.ideas.models import Idea
 from .serializers import ApplyStructureSerializer
-from .services import challenge_idea, structure_idea
+from .services import (challenge_idea, structure_idea, summarize_idea, build_idea_context)
 from django.db import transaction
+from .models import AIAnalysis, AIAnalysisType
+
+
 
 
 class StructureIdeaView(APIView):
@@ -30,6 +33,18 @@ class StructureIdeaView(APIView):
             title=idea.title,
             description=idea.description,
         )
+
+        AIAnalysis.objects.create(
+            idea=idea,
+            user=request.user,
+            analysis_type=AIAnalysisType.STRUCTURE,
+            input_context=(
+                f"Title: {idea.title}\n"
+                f"Description: {idea.description}"
+            ),
+            result=result,
+            provider="mock",
+)
 
         return Response(result)
 
@@ -57,6 +72,21 @@ class ChallengeIdeaView(APIView):
             solution=idea.solution,
             target=idea.target,
         )
+
+        AIAnalysis.objects.create(
+        idea=idea,
+        user=request.user,
+        analysis_type=AIAnalysisType.CHALLENGE,
+        input_context=(
+            f"Title: {idea.title}\n"
+            f"Description: {idea.description}\n"
+            f"Problem: {idea.problem}\n"
+            f"Solution: {idea.solution}\n"
+            f"Target: {idea.target}"
+        ),
+        result=result,
+        provider="mock",
+)
 
         return Response(result)
 
@@ -142,3 +172,32 @@ class ApplyStructureView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+class SummarizeIdeaView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, idea_id):
+
+        try:
+            idea = Idea.objects.get(
+                id=idea_id,
+                user=request.user,
+            )
+        except Idea.DoesNotExist:
+            return Response(
+                {"detail": "Idée introuvable."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+       
+        result = summarize_idea(idea)
+
+        AIAnalysis.objects.create(
+            idea=idea,
+            user=request.user,
+            analysis_type=AIAnalysisType.SUMMARY,
+            input_context=build_idea_context(idea),
+            result=result,
+            provider="mock",
+        )
+
+        return Response(result)
