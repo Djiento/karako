@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "apps.validation",
     "apps.projects",
     "apps.tasks",
+    "apps.ia",
 ]
 
 MIDDLEWARE = [
