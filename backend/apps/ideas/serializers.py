@@ -27,6 +27,7 @@ class IdeaSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "archived_at",
+            "next_action",
         ]
 
         read_only_fields = [

@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import ChallengeIdeaView, StructureIdeaView
+from .views import ChallengeIdeaView, StructureIdeaView, ApplyStructureView
 
 
 urlpatterns = [
@@ -13,5 +13,10 @@ urlpatterns = [
         "ideas/<int:idea_id>/challenge/",
         ChallengeIdeaView.as_view(),
         name="ai-challenge-idea",
+    ),
+    path(
+        "ideas/<int:idea_id>/apply-structure/",
+        ApplyStructureView.as_view(),
+        name="ai-apply-structure",
     ),
 ]

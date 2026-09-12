@@ -30,6 +30,8 @@ class Idea(models.Model):
 
     target = models.TextField(blank=True)
 
+    next_action = models.TextField(blank=True)
+
     status = models.CharField(
         max_length=30,
         choices=IdeaStatus.choices,
