@@ -5,42 +5,49 @@ from .base import AIProvider
 
 class MockAIProvider(AIProvider):
 
+    def generate(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+    ) -> str:
+
+        return (
+            "Réponse simulée par le provider Mock de Karako.\n\n"
+            "Le contexte et le prompt ont bien été transmis "
+            "au moteur IA."
+        )
+
     def structure_idea(
         self,
+        *,
         title: str,
         description: str,
     ) -> dict[str, Any]:
 
         return {
-            "problem": (
-                "Le problème semble être lié au besoin exprimé "
-                "dans la description de l'idée."
-            ),
-            "solution": (
-                "La solution consiste à construire une réponse "
-                "numérique adaptée au problème identifié."
-            ),
-            "target": (
-                "Les utilisateurs concernés par le problème décrit."
-            ),
+            "problem": "Problème identifié par le moteur IA.",
+            "solution": "Solution proposée à partir de l'idée.",
+            "target": "Cible potentielle.",
             "hypotheses": [
-                "Le problème est suffisamment important pour justifier une solution.",
-                "Les utilisateurs ciblés rencontrent réellement ce problème.",
-                "Une solution numérique pourrait améliorer la situation.",
+                "Les utilisateurs rencontrent réellement ce problème.",
+                "La solution proposée répond au besoin.",
+                "Les utilisateurs sont prêts à adopter la solution.",
             ],
             "questions": [
-                "À quelle fréquence ce problème se produit-il ?",
-                "Comment les utilisateurs le résolvent-ils actuellement ?",
-                "Existe-t-il déjà des solutions concurrentes ?",
+                "Quel est le problème le plus important à résoudre ?",
+                "Qui rencontre ce problème le plus souvent ?",
+                "Comment vérifier cette hypothèse rapidement ?",
             ],
             "next_action": (
-                "Interroger 3 utilisateurs correspondant à la cible "
-                "afin de vérifier que le problème est réel."
+                "Interroger quelques utilisateurs potentiels "
+                "pour vérifier le problème."
             ),
         }
 
     def challenge_idea(
         self,
+        *,
         title: str,
         description: str,
         problem: str,
@@ -50,23 +57,20 @@ class MockAIProvider(AIProvider):
 
         return {
             "strengths": [
-                "Le problème est identifiable.",
-                "Une cible est définie.",
+                "Le problème semble clairement identifiable.",
                 "La solution peut être testée rapidement.",
             ],
             "risks": [
-                "Le niveau réel de douleur du problème reste à confirmer.",
-                "La cible est encore trop large.",
-                "La concurrence doit être étudiée.",
+                "Le besoin réel des utilisateurs doit être confirmé.",
+                "La proposition de valeur doit être testée.",
             ],
             "questions": [
-                "Qui paierait pour cette solution ?",
-                "Quelle alternative utilise actuellement la cible ?",
-                "Qu'est-ce qui rendrait cette solution meilleure ?",
+                "Existe-t-il déjà des solutions concurrentes ?",
+                "Pourquoi un utilisateur choisirait cette solution ?",
             ],
             "recommendation": (
-                "Valider d'abord le problème auprès d'utilisateurs réels "
-                "avant de développer la solution."
+                "Valider d'abord le problème auprès "
+                "d'utilisateurs potentiels."
             ),
         }
 
@@ -78,25 +82,38 @@ class MockAIProvider(AIProvider):
 
         return {
             "summary": (
-                "L'idée présente une problématique qui pourrait "
-                "être résolue par une solution numérique. "
-                "Les informations disponibles permettent de "
-                "commencer à cadrer le problème, mais plusieurs "
-                "éléments doivent encore être validés."
+                "Synthèse simulée du contexte de l'idée."
             ),
             "known": [
-                "Une problématique a été identifiée.",
-                "Une solution potentielle a été formulée.",
-                "Une cible initiale a été définie.",
+                "Le contexte contient une idée.",
             ],
             "unknown": [
-                "Le niveau réel de douleur du problème.",
-                "La volonté des utilisateurs de payer.",
-                "Les solutions actuellement utilisées.",
+                "Le besoin réel doit encore être confirmé.",
             ],
             "contradictions": [],
             "next_action": (
-                "Réaliser des entretiens avec des utilisateurs "
-                "de la cible."
+                "Identifier l'information la plus importante "
+                "à vérifier."
             ),
         }
+
+    def chat(
+        self,
+        *,
+        context: str,
+        messages: list[dict[str, str]],
+    ) -> str:
+
+        last_message = ""
+
+        if messages:
+            last_message = messages[-1].get(
+                "content",
+                "",
+            )
+
+        return (
+            "Réponse simulée du Chat IA Karako.\n\n"
+            f"Question : {last_message}\n\n"
+            "Le contexte de l'idée a été transmis au moteur IA."
+        )

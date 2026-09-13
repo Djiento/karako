@@ -29,8 +29,16 @@ services:
       DATABASE_PASSWORD: karako_dev_password
       DATABASE_HOST: db
       DATABASE_PORT: 5432
+
+      AI_PROVIDER: mock
+
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_MODEL: gemma3
+      GEMINI_API_KEY: ""
+      GEMINI_MODEL: gemini-3.8-flash
     depends_on:
       - db
+
 
   frontend:
     build:

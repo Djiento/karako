@@ -4,10 +4,19 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from apps.validation.models import Hypothesis
 from apps.ideas.models import Idea
-from .serializers import ApplyStructureSerializer
-from .services import (challenge_idea, structure_idea, summarize_idea, build_idea_context)
+from .services import (challenge_idea, structure_idea, summarize_idea, build_idea_context, chat_with_idea,)
 from django.db import transaction
 from .models import AIAnalysis, AIAnalysisType
+from django.shortcuts import get_object_or_404
+from .models import AIChatMessage, AIChatSession
+from .serializers import (
+    AIChatMessageSerializer,
+    AIChatSessionSerializer,
+    ChatMessageSerializer,
+    ApplyStructureSerializer,)
+from .actions import apply_ai_action
+from .models import AIAction
+from .serializers import AIActionSerializer
 
 
 
@@ -201,3 +210,215 @@ class SummarizeIdeaView(APIView):
         )
 
         return Response(result)
+
+class IdeaChatView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, idea_id):
+
+        serializer = ChatMessageSerializer(
+            data=request.data
+        )
+
+        serializer.is_valid(raise_exception=True)
+
+        idea = get_object_or_404(
+            Idea,
+            id=idea_id,
+            user=request.user,
+        )
+
+        session_id = request.data.get("session_id")
+
+        if session_id:
+            session = get_object_or_404(
+                AIChatSession,
+                id=session_id,
+                idea=idea,
+                user=request.user,
+            )
+        else:
+            session = AIChatSession.objects.create(
+                idea=idea,
+                user=request.user,
+                title=idea.title,
+            )
+
+        user_message = AIChatMessage.objects.create(
+            session=session,
+            role=AIChatMessage.Role.USER,
+            content=serializer.validated_data["message"],
+        )
+
+        previous_messages = (
+            session.messages
+            .exclude(id=user_message.id)
+            .order_by("created_at")
+        )
+
+        messages = [
+            {
+                "role": message.role,
+                "content": message.content,
+            }
+            for message in previous_messages
+        ]
+
+        messages.append(
+            {
+                "role": AIChatMessage.Role.USER,
+                "content": user_message.content,
+            }
+        )
+
+        assistant_content = chat_with_idea(
+            idea=idea,
+            messages=messages,
+        )
+
+        assistant_message = AIChatMessage.objects.create(
+            session=session,
+            role=AIChatMessage.Role.ASSISTANT,
+            content=assistant_content,
+        )
+
+        session.save(update_fields=["updated_at"])
+
+        return Response(
+            {
+                "session_id": session.id,
+                "message": AIChatMessageSerializer(
+                    assistant_message
+                ).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+class IdeaChatSessionsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, idea_id):
+
+        idea = get_object_or_404(
+            Idea,
+            id=idea_id,
+            user=request.user,
+        )
+
+        sessions = AIChatSession.objects.filter(
+            idea=idea,
+            user=request.user,
+        )
+
+        serializer = AIChatSessionSerializer(
+            sessions,
+            many=True,
+        )
+
+        return Response(serializer.data)
+
+
+class IdeaChatHistoryView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, idea_id, session_id):
+
+        idea = get_object_or_404(
+            Idea,
+            id=idea_id,
+            user=request.user,
+        )
+
+        session = get_object_or_404(
+            AIChatSession,
+            id=session_id,
+            idea=idea,
+            user=request.user,
+        )
+
+        messages = session.messages.all()
+
+        serializer = AIChatMessageSerializer(
+            messages,
+            many=True,
+        )
+
+        return Response(
+            {
+                "session": AIChatSessionSerializer(
+                    session
+                ).data,
+                "messages": serializer.data,
+            }
+        )
+
+class IdeaAIActionsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, idea_id):
+
+        idea = get_object_or_404(
+            Idea,
+            id=idea_id,
+            user=request.user,
+        )
+
+        actions = AIAction.objects.filter(
+            idea=idea,
+            user=request.user,
+        )
+
+        return Response(
+            AIActionSerializer(
+                actions,
+                many=True,
+            ).data
+        )
+
+class ApplyAIActionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(
+        self,
+        request,
+        idea_id,
+        action_id,
+    ):
+
+        action = get_object_or_404(
+            AIAction,
+            id=action_id,
+            idea_id=idea_id,
+            user=request.user,
+        )
+
+        try:
+            result = apply_ai_action(
+                action=action,
+                user=request.user,
+            )
+
+        except (
+            PermissionError,
+            ValueError,
+            KeyError,
+        ) as exc:
+
+            return Response(
+                {
+                    "detail": str(exc),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            {
+                "action": AIActionSerializer(
+                    action
+                ).data,
+                "result": {
+                    "id": result.id,
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
