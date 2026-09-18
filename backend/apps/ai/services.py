@@ -1,4 +1,5 @@
 import os
+import json
 from .providers.base import AIProvider
 from .providers.mock import MockAIProvider
 from apps.research.models import Conversation, Research
@@ -12,6 +13,10 @@ from apps.ai.prompts.structure_idea import (
 )
 from apps.ai.prompts.summarize import (
     build_prompt as build_summary_prompt,
+)
+
+from apps.ai.prompts.structure_idea import (
+    build_prompt as build_structure_prompt,
 )
 
 
@@ -316,3 +321,56 @@ def chat_with_idea(
         context=context,
         messages=messages,
     )
+
+
+def structure_idea(*, idea, provider) -> dict:
+    user_prompt = build_structure_prompt(
+        title=idea.title,
+        description=idea.description,
+        problem=idea.problem,
+        solution=idea.solution,
+        target=idea.target,
+        next_action=idea.next_action,
+    )
+
+    raw_result = provider.generate(
+        system_prompt=SYSTEM_PROMPT,
+        user_prompt=user_prompt,
+    )
+
+    try:
+        result = json.loads(raw_result)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            "Le provider IA a retourné une réponse JSON invalide."
+        ) from exc
+
+    if not isinstance(result, dict):
+        raise ValueError(
+            "La réponse IA doit être un objet JSON."
+        )
+
+    return {
+        "problem": str(
+            result.get("problem", "")
+        ),
+        "solution": str(
+            result.get("solution", "")
+        ),
+        "target": str(
+            result.get("target", "")
+        ),
+        "hypotheses": [
+            str(item)
+            for item in result.get("hypotheses", [])
+            if item
+        ],
+        "open_questions": [
+            str(item)
+            for item in result.get("open_questions", [])
+            if item
+        ],
+        "next_action": str(
+            result.get("next_action", "")
+        ),
+    }

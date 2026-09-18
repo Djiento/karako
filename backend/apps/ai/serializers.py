@@ -55,3 +55,38 @@ class AIActionSerializer(serializers.Serializer):
     status = serializers.CharField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
     applied_at = serializers.DateTimeField(read_only=True)
+
+
+
+class StructureIdeaSerializer(serializers.Serializer):
+    problem = serializers.CharField(
+        allow_blank=True,
+        required=False,
+    )
+
+    solution = serializers.CharField(
+        allow_blank=True,
+        required=False,
+    )
+
+    target = serializers.CharField(
+        allow_blank=True,
+        required=False,
+    )
+
+    hypotheses = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list,
+    )
+
+    open_questions = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list,
+    )
+
+    next_action = serializers.CharField(
+        allow_blank=True,
+        required=False,
+    )

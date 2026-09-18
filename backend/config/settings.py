@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 
 import os
 from pathlib import Path
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -38,8 +39,14 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
+
+# Third-party
     "rest_framework",
     "corsheaders",
+    "rest_framework_simplejwt.token_blacklist",
+
+
+# Karako
     "apps.users",
     "apps.ideas",
     "apps.research",
@@ -151,6 +158,27 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+}
+
+SIMPLE_JWT = {
+    # Access token court
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+
+    # Session renouvelable pendant 7 jours
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+
+    # Sécurité
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+
+    # Vérification de la rotation
+    "UPDATE_LAST_LOGIN": False,
+
+    # Algorithme
+    "ALGORITHM": "HS256",
+
+    # Header Authorization: Bearer <token>
+    "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
 CORS_ALLOWED_ORIGINS = [

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Capture
+from .models import Capture, Idea
 
 
 class CaptureSerializer(serializers.ModelSerializer):
@@ -22,6 +22,18 @@ class CaptureSerializer(serializers.ModelSerializer):
 
         read_only_fields = [
             "id",
-            "user",
+            "status",
+            "captured_at",
             "created_at",
         ]
+
+    def validate_idea(self, idea):
+        request = self.context.get("request")
+
+        if request and idea is not None:
+            if idea.user != request.user:
+                raise serializers.ValidationError(
+                    "Cette idée ne vous appartient pas."
+                )
+
+        return idea

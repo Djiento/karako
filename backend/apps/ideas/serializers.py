@@ -36,3 +36,15 @@ class IdeaSerializer(serializers.ModelSerializer):
             "updated_at",
             "archived_at",
         ]
+
+    def validate_tags(self, tags):
+        request = self.context.get("request")
+
+        if request:
+            for tag in tags:
+                if tag.user != request.user:
+                    raise serializers.ValidationError(
+                        "Un ou plusieurs tags ne vous appartiennent pas."
+                    )
+
+        return tags

@@ -4,11 +4,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from apps.validation.models import Hypothesis
 from apps.ideas.models import Idea
+from apps.ideas.serializers import IdeaSerializer
 from .services import (challenge_idea, structure_idea, summarize_idea, build_idea_context, chat_with_idea,)
 from django.db import transaction
 from .models import AIAnalysis, AIAnalysisType
 from django.shortcuts import get_object_or_404
 from .models import AIChatMessage, AIChatSession
+from .serializers import StructureIdeaSerializer
 from .serializers import (
     AIChatMessageSerializer,
     AIChatSessionSerializer,
@@ -56,6 +58,53 @@ class StructureIdeaView(APIView):
 )
 
         return Response(result)
+
+class ApplyStructureView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, idea_id):
+        try:
+            idea = Idea.objects.get(
+                id=idea_id,
+                user=request.user,
+            )
+        except Idea.DoesNotExist:
+            return Response(
+                {"detail": "Idée introuvable."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        data = request.data
+
+        serializer = StructureIdeaSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+
+        validated = serializer.validated_data
+
+        idea.problem = validated.get("problem", idea.problem)
+        idea.solution = validated.get("solution", idea.solution)
+        idea.target = validated.get("target", idea.target)
+        idea.next_action = validated.get("next_action", idea.next_action)
+
+        idea.save(
+            update_fields=[
+                "problem",
+                "solution",
+                "target",
+                "next_action",
+                "updated_at",
+            ]
+        )
+
+        return Response(
+            {
+                "idea": IdeaSerializer(
+                    idea,
+                    context={"request": request},
+                ).data,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class ChallengeIdeaView(APIView):
@@ -419,6 +468,75 @@ class ApplyAIActionView(APIView):
                 "result": {
                     "id": result.id,
                 },
+            },
+            status=status.HTTP_200_OK,
+        )
+
+class StructureIdeaView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, idea_id):
+        try:
+            idea = Idea.objects.get(
+                id=idea_id,
+                user=request.user,
+            )
+        except Idea.DoesNotExist:
+            return Response(
+                {
+                    "detail": "Idée introuvable."
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        provider = get_ai_provider()
+
+        try:
+            result = structure_idea(
+                idea=idea,
+                provider=provider,
+            )
+        except ValueError as exc:
+            return Response(
+                {
+                    "detail": str(exc)
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        except Exception as exc:
+            return Response(
+                {
+                    "detail": (
+                        "Une erreur est survenue "
+                        "pendant la structuration."
+                    )
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        serializer = StructureIdeaSerializer(
+            data=result
+        )
+        serializer.is_valid(raise_exception=True)
+
+        AIAnalysis.objects.create(
+            idea=idea,
+            user=request.user,
+            analysis_type=AIAnalysisType.STRUCTURE,
+            input_context=(
+                f"Titre : {idea.title}\n\n"
+                f"Description : {idea.description}"
+            ),
+            result=serializer.validated_data,
+            provider=provider.name,
+        )
+
+        return Response(
+            {
+                "idea_id": idea.id,
+                "analysis_type": AIAnalysisType.STRUCTURE,
+                "provider": provider.name,
+                "result": serializer.validated_data,
             },
             status=status.HTTP_200_OK,
         )
