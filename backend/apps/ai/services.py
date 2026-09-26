@@ -19,6 +19,10 @@ from apps.ai.prompts.structure_idea import (
     build_prompt as build_structure_prompt,
 )
 
+from apps.ai.prompts.challenge_idea import (
+    SYSTEM_PROMPT as CHALLENGE_SYSTEM_PROMPT,
+    build_prompt as build_challenge_prompt,
+)
 
 def get_ai_provider() -> AIProvider:
 
@@ -368,6 +372,58 @@ def structure_idea(*, idea, provider) -> dict:
         "open_questions": [
             str(item)
             for item in result.get("open_questions", [])
+            if item
+        ],
+        "next_action": str(
+            result.get("next_action", "")
+        ),
+    }
+
+def challenge_idea(*, idea, provider) -> dict:
+    user_prompt = build_challenge_prompt(
+        title=idea.title,
+        description=idea.description,
+        problem=idea.problem,
+        solution=idea.solution,
+        target=idea.target,
+    )
+
+    raw_result = provider.generate(
+        system_prompt=CHALLENGE_SYSTEM_PROMPT,
+        user_prompt=user_prompt,
+    )
+
+    try:
+        result = json.loads(raw_result)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            "Le provider IA a retourné une réponse JSON invalide."
+        ) from exc
+
+    if not isinstance(result, dict):
+        raise ValueError(
+            "La réponse IA doit être un objet JSON."
+        )
+
+    return {
+        "hypotheses": [
+            str(item)
+            for item in result.get("hypotheses", [])
+            if item
+        ],
+        "risks": [
+            str(item)
+            for item in result.get("risks", [])
+            if item
+        ],
+        "critical_questions": [
+            str(item)
+            for item in result.get("critical_questions", [])
+            if item
+        ],
+        "missing_information": [
+            str(item)
+            for item in result.get("missing_information", [])
             if item
         ],
         "next_action": str(

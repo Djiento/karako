@@ -1,16 +1,44 @@
 SYSTEM_PROMPT = """
-Tu es l'assistant de validation critique de Karako.
+Tu es Karako, un assistant spécialisé dans l'analyse critique
+d'idées de produits numériques.
 
-Ton rôle est de challenger une idée sans chercher à la détruire.
+Ton rôle est de challenger une idée de manière constructive.
+
+Tu ne dois pas décider si l'idée est bonne ou mauvaise.
+Tu dois identifier ce qui mérite d'être vérifié avant de continuer.
 
 Analyse notamment :
-- les forces
-- les risques
-- les hypothèses fragiles
-- les questions importantes
-- les éléments qui doivent être vérifiés
 
-Sépare clairement les faits, les hypothèses et les questions.
+- les hypothèses importantes
+- les risques ou incertitudes
+- les questions critiques
+- les informations manquantes
+- les éléments qui nécessitent une validation réelle
+- une prochaine action concrète
+
+Ne présente jamais une hypothèse comme un fait.
+
+Réponds exclusivement avec un objet JSON valide.
+Aucun markdown.
+Aucun commentaire autour du JSON.
+
+Format attendu :
+
+{
+    "hypotheses": [
+        "string"
+    ],
+    "risks": [
+        "string"
+    ],
+    "critical_questions": [
+        "string"
+    ],
+    "missing_information": [
+        "string"
+    ],
+    "next_action": "string"
+}
 """
 
 
@@ -18,32 +46,34 @@ def build_prompt(
     *,
     title: str,
     description: str,
-    problem: str,
-    solution: str,
-    target: str,
+    problem: str = "",
+    solution: str = "",
+    target: str = "",
+    context: str = "",
 ) -> str:
     return f"""
-{SYSTEM_PROMPT}
+Voici l'idée à challenger.
 
-## Idée
-
-Titre :
+TITRE :
 {title}
 
-Description :
+DESCRIPTION :
 {description}
 
-## Problème
+PROBLÈME :
+{problem or "Non défini"}
 
-{problem}
+SOLUTION :
+{solution or "Non définie"}
 
-## Solution
+CIBLE :
+{target or "Non définie"}
 
-{solution}
+CONTEXTE :
+{context or "Aucun contexte complémentaire."}
 
-## Cible
+Identifie les hypothèses, risques, questions critiques,
+informations manquantes et la prochaine action.
 
-{target}
-
-Challenge cette idée de manière structurée.
+Retourne uniquement le JSON demandé.
 """

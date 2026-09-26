@@ -90,3 +90,30 @@ class StructureIdeaSerializer(serializers.Serializer):
         allow_blank=True,
         required=False,
     )
+
+    class ChallengeIdeaSerializer(serializers.Serializer):
+     hypotheses = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list,
+    )
+    risks = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list,
+    )
+    critical_questions = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list,
+    )
+    missing_information = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list,
+    )
+    next_action = serializers.CharField(
+        allow_blank=True,
+        required=False,
+        default="",
+    )

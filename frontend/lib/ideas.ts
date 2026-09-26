@@ -8,9 +8,18 @@ import type {
   Idea,
   ProcessCaptureResult,
   StructureIdeaResult,
+  ChallengeIdeaResult,
 } from "@/types/idea";
 
 
+
+export async function challengeIdea(
+  id: number,
+): Promise<ChallengeIdeaResult> {
+  return apiPost<ChallengeIdeaResult>(
+    `/ai/ideas/${id}/challenge/`,
+  );
+}
 
 export async function getIdeas(): Promise<Idea[]> {
   return apiGet<Idea[]>("/ideas/");

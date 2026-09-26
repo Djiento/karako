@@ -10,15 +10,15 @@ from django.db import transaction
 from .models import AIAnalysis, AIAnalysisType
 from django.shortcuts import get_object_or_404
 from .models import AIChatMessage, AIChatSession
-from .serializers import StructureIdeaSerializer
 from .serializers import (
     AIChatMessageSerializer,
     AIChatSessionSerializer,
     ChatMessageSerializer,
-    ApplyStructureSerializer,)
+    ApplyStructureSerializer,
+    StructureIdeaSerializer,
+    AIActionSerializer)
 from .actions import apply_ai_action
 from .models import AIAction
-from .serializers import AIActionSerializer
 
 
 
@@ -111,7 +111,6 @@ class ChallengeIdeaView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, idea_id):
-
         try:
             idea = Idea.objects.get(
                 id=idea_id,
@@ -123,30 +122,53 @@ class ChallengeIdeaView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        result = challenge_idea(
-            title=idea.title,
-            description=idea.description,
-            problem=idea.problem,
-            solution=idea.solution,
-            target=idea.target,
-        )
+        provider = get_ai_provider()
+
+        try:
+            result = challenge_idea(
+                idea=idea,
+                provider=provider,
+            )
+        except ValueError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        except Exception:
+            return Response(
+                {
+                    "detail": (
+                        "Une erreur est survenue pendant "
+                        "l'analyse de l'idée."
+                    )
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        serializer = ChallengeIdeaSerializer(data=result)
+        serializer.is_valid(raise_exception=True)
 
         AIAnalysis.objects.create(
-        idea=idea,
-        user=request.user,
-        analysis_type=AIAnalysisType.CHALLENGE,
-        input_context=(
-            f"Title: {idea.title}\n"
-            f"Description: {idea.description}\n"
-            f"Problem: {idea.problem}\n"
-            f"Solution: {idea.solution}\n"
-            f"Target: {idea.target}"
-        ),
-        result=result,
-        provider="mock",
-)
+            idea=idea,
+            user=request.user,
+            analysis_type=AIAnalysisType.CHALLENGE,
+            input_context=(
+                f"Titre : {idea.title}\n\n"
+                f"Description : {idea.description}"
+            ),
+            result=serializer.validated_data,
+            provider=provider.name,
+        )
 
-        return Response(result)
+        return Response(
+            {
+                "idea_id": idea.id,
+                "analysis_type": AIAnalysisType.CHALLENGE,
+                "provider": provider.name,
+                "result": serializer.validated_data,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 class ApplyStructureView(APIView):
     permission_classes = [IsAuthenticated]
@@ -540,3 +562,5 @@ class StructureIdeaView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+    

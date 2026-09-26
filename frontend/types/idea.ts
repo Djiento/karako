@@ -88,3 +88,18 @@ export interface StructureIdeaResult {
   provider: string;
   result: IdeaStructure;
 }
+
+export interface IdeaChallenge {
+  hypotheses: string[];
+  risks: string[];
+  critical_questions: string[];
+  missing_information: string[];
+  next_action: string;
+}
+
+export interface ChallengeIdeaResult {
+  idea_id: number;
+  analysis_type: string;
+  provider: string;
+  result: IdeaChallenge;
+}
