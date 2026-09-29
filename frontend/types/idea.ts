@@ -103,3 +103,45 @@ export interface ChallengeIdeaResult {
   provider: string;
   result: IdeaChallenge;
 }
+
+export interface AIAnalysis {
+  id: number;
+  analysis_type: string;
+  input_context: string;
+  result: Record<string, unknown>;
+  provider: string;
+  created_at: string;
+}
+
+
+export type ResearchType =
+  | "NOTE"
+  | "URL"
+  | "ARTICLE"
+  | "VIDEO"
+  | "DOCUMENT"
+  | "INTERVIEW"
+  | "OTHER";
+
+export interface ResearchItem {
+  id: number;
+  idea: number;
+  title: string;
+  research_type: ResearchType;
+  url: string;
+  content: string;
+  notes: string;
+  source: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateResearchPayload {
+  idea: number;
+  title: string;
+  research_type?: ResearchType;
+  url?: string;
+  content?: string;
+  notes?: string;
+  source?: string;
+}

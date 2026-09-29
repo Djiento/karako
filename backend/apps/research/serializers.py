@@ -1,56 +1,20 @@
 from rest_framework import serializers
 
-from .models import Conversation, Research
+from .models import ResearchItem
 
 
-class ResearchSerializer(serializers.ModelSerializer):
-
+class ResearchItemSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Research
-
+        model = ResearchItem
         fields = [
             "id",
             "idea",
             "title",
-            "content",
             "research_type",
-            "source_url",
-            "source_name",
-            "is_finding",
-            "created_at",
-            "updated_at",
-        ]
-
-        read_only_fields = [
-            "id",
-            "created_at",
-            "updated_at",
-        ]
-
-    def validate_idea(self, idea):
-        request = self.context.get("request")
-
-        if request and idea.user != request.user:
-            raise serializers.ValidationError(
-                "Cette idée ne vous appartient pas."
-            )
-
-        return idea
-
-
-class ConversationSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = Conversation
-
-        fields = [
-            "id",
-            "idea",
-            "title",
-            "provider",
+            "url",
             "content",
-            "summary",
-            "source_url",
+            "notes",
+            "source",
             "created_at",
             "updated_at",
         ]

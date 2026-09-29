@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from apps.ai.models import AIAnalysis
+
 
 
 class ApplyStructureSerializer(serializers.Serializer):
@@ -91,8 +93,9 @@ class StructureIdeaSerializer(serializers.Serializer):
         required=False,
     )
 
-    class ChallengeIdeaSerializer(serializers.Serializer):
-     hypotheses = serializers.ListField(
+class ChallengeIdeaSerializer(serializers.Serializer):
+    
+    hypotheses = serializers.ListField(
         child=serializers.CharField(),
         required=False,
         default=list,
@@ -117,3 +120,16 @@ class StructureIdeaSerializer(serializers.Serializer):
         required=False,
         default="",
     )
+
+class AIAnalysisSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AIAnalysis
+        fields = [
+            "id",
+            "analysis_type",
+            "input_context",
+            "result",
+            "provider",
+            "created_at",
+        ]
+        read_only_fields = fields

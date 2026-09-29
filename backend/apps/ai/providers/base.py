@@ -3,8 +3,11 @@ from typing import Any
 
 
 
-class AIProvider(ABC):
+from abc import ABC, abstractmethod
+from typing import Any
 
+
+class AIProvider(ABC):
     name = "base"
 
     @abstractmethod
@@ -16,19 +19,6 @@ class AIProvider(ABC):
     ) -> str:
         raise NotImplementedError
 
-class AIProvider(ABC):
-
-    @abstractmethod
-    def generate(
-        self,
-        *,
-        system_prompt: str,
-        user_prompt: str,
-    ) -> str:
-        pass
-
-class AIProvider(ABC):
-
     @abstractmethod
     def structure_idea(
         self,
@@ -36,7 +26,7 @@ class AIProvider(ABC):
         title: str,
         description: str,
     ) -> dict[str, Any]:
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def challenge_idea(
@@ -48,7 +38,7 @@ class AIProvider(ABC):
         solution: str,
         target: str,
     ) -> dict[str, Any]:
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def summarize(
@@ -56,7 +46,7 @@ class AIProvider(ABC):
         *,
         content: str,
     ) -> dict[str, Any]:
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def chat(
@@ -65,4 +55,4 @@ class AIProvider(ABC):
         context: str,
         messages: list[dict[str, str]],
     ) -> str:
-        pass
+        raise NotImplementedError

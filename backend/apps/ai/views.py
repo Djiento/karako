@@ -16,9 +16,12 @@ from .serializers import (
     ChatMessageSerializer,
     ApplyStructureSerializer,
     StructureIdeaSerializer,
+    ChallengeIdeaSerializer,
+    AIAnalysisSerializer,
     AIActionSerializer)
 from .actions import apply_ai_action
 from .models import AIAction
+from .providers import get_ai_provider
 
 
 
@@ -106,6 +109,39 @@ class ApplyStructureView(APIView):
             status=status.HTTP_200_OK,
         )
 
+class IdeaAIAnalysesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, idea_id):
+        try:
+            idea = Idea.objects.get(
+                id=idea_id,
+                user=request.user,
+            )
+        except Idea.DoesNotExist:
+            return Response(
+                {"detail": "Idée introuvable."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        analyses = (
+            AIAnalysis.objects
+            .filter(
+                idea=idea,
+                user=request.user,
+            )
+            .order_by("-created_at")
+        )
+
+        serializer = AIAnalysisSerializer(
+            analyses,
+            many=True,
+        )
+
+        return Response(
+            serializer.data,
+            status=status.HTTP_200_OK,
+        )
 
 class ChallengeIdeaView(APIView):
     permission_classes = [IsAuthenticated]

@@ -17,11 +17,13 @@ import {
   updateIdea,
   structureIdea,
   applyStructure,
+  challengeIdea,
 } from "@/lib/ideas";
 import type {
   Idea,
   IdeaStatus,
   IdeaStructure,
+  IdeaChallenge,
 } from "@/types/idea";
 
 const statusLabels: Record<string, string> = {
@@ -66,6 +68,9 @@ export default function IdeaDetailPage() {
     useState<IdeaStructure | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
 
+  const [challenging, setChallenging] = useState(false);
+  const [challenge, setChallenge] = useState<IdeaChallenge | null>(null);
+
   const [applyingStructure, setApplyingStructure] =
     useState(false);
   const [applyError, setApplyError] =
@@ -90,6 +95,20 @@ export default function IdeaDetailPage() {
       setStructuring(false);
     }
   }
+
+  async function handleChallenge() {
+  setChallenging(true);
+  setAiError(null);
+
+  try {
+    const response = await challengeIdea(id);
+    setChallenge(response.result);
+  } catch {
+    setAiError("Impossible de challenger cette idée avec Karako.");
+  } finally {
+    setChallenging(false);
+  }
+}
 
   /**
    * Applique la structure proposée par l'IA.
@@ -436,6 +455,15 @@ export default function IdeaDetailPage() {
                 ? "Karako analyse..."
                 : "Structurer avec Karako"}
             </button>
+            <button
+                type="button"
+                onClick={handleChallenge}
+                disabled={challenging}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Sparkles size={17} />
+                {challenging ? "Karako challenge..." : "Challenger l'idée"}
+            </button>
 
             <button
               type="button"
@@ -448,6 +476,136 @@ export default function IdeaDetailPage() {
           </div>
         </div>
       </header>
+
+      {challenge && (
+  <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="mb-6 flex items-start justify-between gap-4">
+      <div>
+        <h2 className="text-lg font-semibold text-slate-900">
+          Challenge Karako
+        </h2>
+
+        <p className="mt-1 text-sm text-slate-500">
+          Les points qui méritent d'être vérifiés avant de continuer.
+        </p>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setChallenge(null)}
+        className="text-sm text-slate-500 hover:text-slate-900"
+      >
+        Fermer
+      </button>
+    </div>
+
+    <div className="grid gap-6 md:grid-cols-2">
+      <div>
+        <h3 className="mb-3 text-sm font-semibold text-slate-900">
+          Hypothèses
+        </h3>
+
+        {challenge.hypotheses.length > 0 ? (
+          <ul className="space-y-2">
+            {challenge.hypotheses.map((item, index) => (
+              <li
+                key={`hypothesis-${index}`}
+                className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700"
+              >
+                {item}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-slate-400">
+            Aucune hypothèse identifiée.
+          </p>
+        )}
+      </div>
+
+      <div>
+        <h3 className="mb-3 text-sm font-semibold text-slate-900">
+          Risques et incertitudes
+        </h3>
+
+        {challenge.risks.length > 0 ? (
+          <ul className="space-y-2">
+            {challenge.risks.map((item, index) => (
+              <li
+                key={`risk-${index}`}
+                className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700"
+              >
+                {item}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-slate-400">
+            Aucun risque identifié.
+          </p>
+        )}
+      </div>
+
+      <div>
+        <h3 className="mb-3 text-sm font-semibold text-slate-900">
+          Questions critiques
+        </h3>
+
+        {challenge.critical_questions.length > 0 ? (
+          <ul className="space-y-2">
+            {challenge.critical_questions.map((item, index) => (
+              <li
+                key={`question-${index}`}
+                className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700"
+              >
+                {item}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-slate-400">
+            Aucune question critique identifiée.
+          </p>
+        )}
+      </div>
+
+      <div>
+        <h3 className="mb-3 text-sm font-semibold text-slate-900">
+          Informations manquantes
+        </h3>
+
+        {challenge.missing_information.length > 0 ? (
+          <ul className="space-y-2">
+            {challenge.missing_information.map((item, index) => (
+              <li
+                key={`missing-${index}`}
+                className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700"
+              >
+                {item}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-slate-400">
+            Aucune information manquante identifiée.
+          </p>
+        )}
+      </div>
+    </div>
+
+    {challenge.next_action && (
+      <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Prochaine action
+        </p>
+
+        <p className="mt-2 text-sm font-medium text-slate-900">
+          {challenge.next_action}
+        </p>
+      </div>
+    )}
+  </section>
+)}
 
       {/* Erreur IA */}
       {aiError && (

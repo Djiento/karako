@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPatch } from "@/lib/api";
+import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api";
 import type {
   Capture,
   CreateCapturePayload,
@@ -9,6 +9,10 @@ import type {
   ProcessCaptureResult,
   StructureIdeaResult,
   ChallengeIdeaResult,
+  IdeaChallenge,
+  AIAnalysis,
+  CreateResearchPayload,
+  ResearchItem,
 } from "@/types/idea";
 
 
@@ -23,6 +27,53 @@ export async function challengeIdea(
 
 export async function getIdeas(): Promise<Idea[]> {
   return apiGet<Idea[]>("/ideas/");
+}
+
+export async function getIdeaAIAnalyses(
+  id: number,
+): Promise<AIAnalysis[]> {
+  return apiGet<AIAnalysis[]>(
+    `/ai/ideas/${id}/analyses/`,
+  );
+}
+
+export async function getResearch(
+  ideaId?: number,
+): Promise<ResearchItem[]> {
+  const query = ideaId
+    ? `?idea=${ideaId}`
+    : "";
+
+  return apiGet<ResearchItem[]>(
+    `/research/${query}`,
+  );
+}
+
+export async function createResearch(
+  payload: CreateResearchPayload,
+): Promise<ResearchItem> {
+  return apiPost<ResearchItem>(
+    "/research/",
+    payload,
+  );
+}
+
+export async function updateResearch(
+  id: number,
+  payload: Partial<CreateResearchPayload>,
+): Promise<ResearchItem> {
+  return apiPatch<ResearchItem>(
+    `/research/${id}/`,
+    payload,
+  );
+}
+
+export async function deleteResearch(
+  id: number,
+): Promise<void> {
+  await apiDelete(
+    `/research/${id}/`,
+  );
 }
 
 export async function getIdea(id: number): Promise<Idea> {

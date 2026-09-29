@@ -2,47 +2,89 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from apps.ai.context.builder import build_idea_context
-from apps.ideas.models import Idea
+from apps.ideas.models import Capture, Idea
+from django.utils import timezone
 
 
 User = get_user_model()
 
 
-class IdeaContextTests(TestCase):
+class AIContextTests(TestCase):
 
     def setUp(self):
-
         self.user = User.objects.create_user(
             email="context@test.com",
-            password="password123",
+            password="testpassword123",
         )
 
         self.idea = Idea.objects.create(
             user=self.user,
-            title="Application immobilière",
-            description="Une application de gestion.",
-            problem="Les agents manquent d'organisation.",
-            solution="Centraliser les informations.",
-            target="Agents immobiliers.",
+            title="Application de gestion",
+            description="Une application pour gérer une activité.",
         )
 
-    def test_context_contains_idea_data(self):
+    def test_context_contains_idea_information(self):
+        context = build_idea_context(
+            idea=self.idea,
+            user=self.user,
+        )
+
+        self.assertIn(
+            "Application de gestion",
+            context,
+        )
+
+        self.assertIn(
+            "Une application pour gérer une activité.",
+            context,
+        )
+
+    def test_context_contains_captures(self):
+        Capture.objects.create(
+            user=self.user,
+            idea=self.idea,
+            content="Ajouter une fonctionnalité mobile.",
+            capture_type="TEXT",
+            captured_at=timezone.now(),
+        )
+
+        Capture.objects.create(
+            user=other_user,
+            idea=self.idea,
+            content="CONTENU PRIVÉ AUTRE UTILISATEUR",
+            capture_type="TEXT",
+            captured_at=timezone.now(),
+)
 
         context = build_idea_context(
-            self.idea
+            idea=self.idea,
+            user=self.user,
         )
 
         self.assertIn(
-            "Application immobilière",
+            "Ajouter une fonctionnalité mobile.",
             context,
         )
 
-        self.assertIn(
-            "Les agents manquent d'organisation.",
-            context,
+    def test_context_does_not_include_other_user_captures(self):
+        other_user = User.objects.create_user(
+            email="other@test.com",
+            password="testpassword123",
         )
 
-        self.assertIn(
-            "Agents immobiliers.",
+        Capture.objects.create(
+            user=other_user,
+            idea=self.idea,
+            content="CONTENU PRIVÉ AUTRE UTILISATEUR",
+            capture_type="TEXT",
+        )
+
+        context = build_idea_context(
+            idea=self.idea,
+            user=self.user,
+        )
+
+        self.assertNotIn(
+            "CONTENU PRIVÉ AUTRE UTILISATEUR",
             context,
         )

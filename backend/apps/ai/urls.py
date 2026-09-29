@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     ApplyStructureView,
     ChallengeIdeaView,
+    IdeaAIAnalysesView,
     IdeaChatHistoryView,
     IdeaChatSessionsView,
     IdeaChatView,
@@ -61,5 +62,10 @@ urlpatterns = [
         "ideas/<int:idea_id>/actions/<int:action_id>/apply/",
         ApplyAIActionView.as_view(),
         name="ai-action-apply",
+    ),
+    path(
+        "ideas/<int:idea_id>/analyses/",
+        IdeaAIAnalysesView.as_view(),
+        name="ai-idea-analyses",
     ),
 ]

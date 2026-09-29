@@ -1,83 +1,39 @@
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 
-from .models import Conversation, Research
-from .serializers import (
-    ConversationSerializer,
-    ResearchSerializer,
-)
+from .models import ResearchItem
+from .serializers import ResearchItemSerializer
 
 
-class ResearchViewSet(viewsets.ModelViewSet):
-
-    serializer_class = ResearchSerializer
-    permission_classes = [
-        IsAuthenticated,
-    ]
+class ResearchItemViewSet(viewsets.ModelViewSet):
+    serializer_class = ResearchItemSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return (
-            Research.objects
-            .filter(user=self.request.user)
-            .select_related("idea")
-            .order_by("-created_at")
-        )
-
-    def get_queryset(self):
-
         queryset = (
-            Research.objects
-            .filter(user=self.request.user)
-            .select_related("idea")
-    )
-
-        idea_id = self.request.query_params.get("idea")
-
-        if idea_id:
-                queryset = queryset.filter(
-                idea_id=idea_id
-            )
-        return queryset.order_by("-created_at")
-
-    def perform_create(self, serializer):
-        serializer.save(
-            user=self.request.user
-        )
-
-
-class ConversationViewSet(viewsets.ModelViewSet):
-
-    serializer_class = ConversationSerializer
-    permission_classes = [
-        IsAuthenticated,
-    ]
-
-    def get_queryset(self):
-        return (
-            Conversation.objects
+            ResearchItem.objects
             .filter(user=self.request.user)
             .select_related("idea")
             .order_by("-updated_at")
         )
 
-    def get_queryset(self):
-
-        queryset = (
-            Conversation.objects
-            .filter(user=self.request.user)
-            .select_related("idea")
-    )
-
         idea_id = self.request.query_params.get("idea")
 
         if idea_id:
+            queryset = queryset.filter(idea_id=idea_id)
+
+        research_type = self.request.query_params.get(
+            "research_type"
+        )
+
+        if research_type:
             queryset = queryset.filter(
-                idea_id=idea_id
+                research_type=research_type
             )
 
-        return queryset.order_by("-updated_at")
+        return queryset
 
     def perform_create(self, serializer):
         serializer.save(
-            user=self.request.user
+            user=self.request.user,
         )

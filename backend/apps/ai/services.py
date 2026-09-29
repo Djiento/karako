@@ -2,27 +2,23 @@ import os
 import json
 from .providers.base import AIProvider
 from .providers.mock import MockAIProvider
-from apps.research.models import Conversation, Research
+from apps.research.models import ResearchItem
 
+from apps.ai.context.builder import build_idea_context
 from apps.ai.prompts.chat import build_prompt as build_chat_prompt
-from apps.ai.prompts.challenge_idea import (
-    build_prompt as build_challenge_prompt,
-)
-from apps.ai.prompts.structure_idea import (
-    build_prompt as build_structure_prompt,
-)
+
 from apps.ai.prompts.summarize import (
     build_prompt as build_summary_prompt,
 )
-
-from apps.ai.prompts.structure_idea import (
-    build_prompt as build_structure_prompt,
-)
-
 from apps.ai.prompts.challenge_idea import (
     SYSTEM_PROMPT as CHALLENGE_SYSTEM_PROMPT,
     build_prompt as build_challenge_prompt,
 )
+from apps.ai.prompts.structure_idea import (
+    SYSTEM_PROMPT,
+    build_prompt as build_structure_prompt,
+)
+
 
 def get_ai_provider() -> AIProvider:
 
@@ -74,36 +70,6 @@ def get_ai_provider() -> AIProvider:
     return MockAIProvider()
 
 
-def structure_idea(
-    title: str,
-    description: str,
-) -> dict:
-    provider = get_ai_provider()
-
-    return provider.structure_idea(
-        title=title,
-        description=description,
-    )
-
-
-def challenge_idea(
-    title: str,
-    description: str,
-    problem: str,
-    solution: str,
-    target: str,
-) -> dict:
-    provider = get_ai_provider()
-
-    return provider.challenge_idea(
-        title=title,
-        description=description,
-        problem=problem,
-        solution=solution,
-        target=target,
-    )
-
-
 def summarize(content: str) -> dict:
     provider = get_ai_provider()
 
@@ -145,7 +111,7 @@ def build_idea_context(idea) -> str:
             f"# Cible\n{idea.target}"
         )
 
-    researches = Research.objects.filter(
+    researches = ResearchItem.objects.filter(
         idea=idea,
         user=idea.user,
     ).order_by("created_at")
@@ -189,38 +155,6 @@ def get_ai_provider() -> AIProvider:
     return MockAIProvider()
 
 
-def structure_idea(
-    *,
-    title: str,
-    description: str,
-) -> dict:
-    provider = get_ai_provider()
-
-    return provider.structure_idea(
-        title=title,
-        description=description,
-    )
-
-
-def challenge_idea(
-    *,
-    title: str,
-    description: str,
-    problem: str,
-    solution: str,
-    target: str,
-) -> dict:
-    provider = get_ai_provider()
-
-    return provider.challenge_idea(
-        title=title,
-        description=description,
-        problem=problem,
-        solution=solution,
-        target=target,
-    )
-
-
 def build_idea_context(idea) -> str:
     parts = []
 
@@ -246,7 +180,7 @@ def build_idea_context(idea) -> str:
             f"# Cible\n{idea.target}"
         )
 
-    researches = Research.objects.filter(
+    researches = ResearchItem.objects.filter(
         idea=idea,
         user=idea.user,
     ).order_by("created_at")
@@ -353,32 +287,22 @@ def structure_idea(*, idea, provider) -> dict:
         raise ValueError(
             "La réponse IA doit être un objet JSON."
         )
+    
+    context = build_idea_context(
+    idea=idea,
+    user=idea.user,
+)
+    user_prompt = build_structure_prompt(
+        title=idea.title,
+        description=idea.description,
+        problem=idea.problem,
+        solution=idea.solution,
+        target=idea.target,
+        next_action=idea.next_action,
+        context=context,
+)
 
-    return {
-        "problem": str(
-            result.get("problem", "")
-        ),
-        "solution": str(
-            result.get("solution", "")
-        ),
-        "target": str(
-            result.get("target", "")
-        ),
-        "hypotheses": [
-            str(item)
-            for item in result.get("hypotheses", [])
-            if item
-        ],
-        "open_questions": [
-            str(item)
-            for item in result.get("open_questions", [])
-            if item
-        ],
-        "next_action": str(
-            result.get("next_action", "")
-        ),
-    }
-
+   
 def challenge_idea(*, idea, provider) -> dict:
     user_prompt = build_challenge_prompt(
         title=idea.title,
@@ -405,28 +329,16 @@ def challenge_idea(*, idea, provider) -> dict:
             "La réponse IA doit être un objet JSON."
         )
 
-    return {
-        "hypotheses": [
-            str(item)
-            for item in result.get("hypotheses", [])
-            if item
-        ],
-        "risks": [
-            str(item)
-            for item in result.get("risks", [])
-            if item
-        ],
-        "critical_questions": [
-            str(item)
-            for item in result.get("critical_questions", [])
-            if item
-        ],
-        "missing_information": [
-            str(item)
-            for item in result.get("missing_information", [])
-            if item
-        ],
-        "next_action": str(
-            result.get("next_action", "")
-        ),
-    }
+    context = build_idea_context(
+    idea=idea,
+    user=idea.user,
+)
+
+    user_prompt = build_challenge_prompt(
+        title=idea.title,
+        description=idea.description,
+        problem=idea.problem,
+        solution=idea.solution,
+        target=idea.target,
+        context=context,
+)
