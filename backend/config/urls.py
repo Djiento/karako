@@ -12,7 +12,7 @@ urlpatterns = [
     path("api/", include("apps.ideas.urls")),
 
     # Research
-    path("api/", include("apps.research.urls")),
+    path("api/research/", include("apps.research.urls")),
 
     # Validation
     path("api/", include("apps.validation.urls")),

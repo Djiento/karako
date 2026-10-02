@@ -1,13 +1,12 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 
 from apps.ai.context.builder import build_idea_context
 from apps.ideas.models import Capture, Idea
-from django.utils import timezone
-
+from apps.research.models import ResearchItem
 
 User = get_user_model()
-
 
 class AIContextTests(TestCase):
 
@@ -48,14 +47,6 @@ class AIContextTests(TestCase):
             captured_at=timezone.now(),
         )
 
-        Capture.objects.create(
-            user=other_user,
-            idea=self.idea,
-            content="CONTENU PRIVÉ AUTRE UTILISATEUR",
-            capture_type="TEXT",
-            captured_at=timezone.now(),
-)
-
         context = build_idea_context(
             idea=self.idea,
             user=self.user,
@@ -77,6 +68,7 @@ class AIContextTests(TestCase):
             idea=self.idea,
             content="CONTENU PRIVÉ AUTRE UTILISATEUR",
             capture_type="TEXT",
+            captured_at=timezone.now(),
         )
 
         context = build_idea_context(
@@ -86,5 +78,36 @@ class AIContextTests(TestCase):
 
         self.assertNotIn(
             "CONTENU PRIVÉ AUTRE UTILISATEUR",
+            context,
+        )
+
+    def test_context_contains_research(self):
+        ResearchItem.objects.create(
+            user=self.user,
+            idea=self.idea,
+            title="Étude du marché",
+            research_type="ARTICLE",
+            content="Le marché connaît une forte croissance.",
+            notes="Vérifier la source.",
+            source="Example",
+        )
+
+        context = build_idea_context(
+            idea=self.idea,
+            user=self.user,
+        )
+
+        self.assertIn(
+            "Étude du marché",
+            context,
+        )
+
+        self.assertIn(
+            "Le marché connaît une forte croissance.",
+            context,
+        )
+
+        self.assertIn(
+            "[RECHERCHES ASSOCIÉES]",
             context,
         )

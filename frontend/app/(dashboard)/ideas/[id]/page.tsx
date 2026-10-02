@@ -1,7 +1,9 @@
+
 "use client";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import ResearchSection from "@/components/ideas/ResearchSection";
 import {
   ArrowLeft,
   Check,
@@ -25,6 +27,10 @@ import type {
   IdeaStructure,
   IdeaChallenge,
 } from "@/types/idea";
+
+import InboxPage from "@/components/inbox/InboxPage";
+
+
 
 const statusLabels: Record<string, string> = {
   CAPTURED: "Capturée",
@@ -330,6 +336,7 @@ export default function IdeaDetailPage() {
               <X size={16} />
               Annuler
             </button>
+            
 
             <button
               type="button"
@@ -786,6 +793,9 @@ export default function IdeaDetailPage() {
           false,
         )}
       </div>
+        
+          <ResearchSection ideaId={idea.id} />
+           
 
       {/* Informations */}
       <section className="rounded-xl border border-slate-200 bg-white p-5">

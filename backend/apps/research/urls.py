@@ -6,7 +6,7 @@ from .views import ResearchItemViewSet
 router = DefaultRouter()
 
 router.register(
-    "research",
+    "items",
     ResearchItemViewSet,
     basename="research",
 )

@@ -107,10 +107,15 @@ export async function createCapture(
   return apiPost<Capture>("/captures/", payload);
 }
 
+export interface ProcessCaptureResponse {
+  idea: Idea;
+  capture: Capture;
+}
+
 export async function processCapture(
   id: number,
-): Promise<ProcessCaptureResult> {
-  return apiPost<ProcessCaptureResult>(
+): Promise<ProcessCaptureResponse> {
+  return apiPost<ProcessCaptureResponse>(
     `/captures/${id}/process/`,
   );
 }

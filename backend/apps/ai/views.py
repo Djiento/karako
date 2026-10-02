@@ -5,7 +5,6 @@ from rest_framework.views import APIView
 from apps.validation.models import Hypothesis
 from apps.ideas.models import Idea
 from apps.ideas.serializers import IdeaSerializer
-from .services import (challenge_idea, structure_idea, summarize_idea, build_idea_context, chat_with_idea,)
 from django.db import transaction
 from .models import AIAnalysis, AIAnalysisType
 from django.shortcuts import get_object_or_404
@@ -22,6 +21,8 @@ from .serializers import (
 from .actions import apply_ai_action
 from .models import AIAction
 from .providers import get_ai_provider
+from .services import chat_with_idea
+
 
 
 

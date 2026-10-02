@@ -4,8 +4,9 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/hooks/use-auth";
-import { Sidebar } from "./sidebar";
 import { Header } from "./header";
+
+import {AppSidebar} from "./AppSidebar";
 
 export function AppShell({
   children,
@@ -37,7 +38,7 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen bg-slate-50">
-      <Sidebar />
+      <AppSidebar />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Header />

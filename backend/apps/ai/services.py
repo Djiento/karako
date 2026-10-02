@@ -1,5 +1,6 @@
 import os
 import json
+
 from .providers.base import AIProvider
 from .providers.mock import MockAIProvider
 from apps.research.models import ResearchItem
@@ -8,23 +9,22 @@ from apps.ai.context.builder import build_idea_context
 from apps.ai.prompts.chat import build_prompt as build_chat_prompt
 
 from apps.ai.prompts.summarize import (
-    build_prompt as build_summary_prompt,
+build_prompt as build_summary_prompt,
 )
 from apps.ai.prompts.challenge_idea import (
-    SYSTEM_PROMPT as CHALLENGE_SYSTEM_PROMPT,
-    build_prompt as build_challenge_prompt,
+SYSTEM_PROMPT as CHALLENGE_SYSTEM_PROMPT,
+build_prompt as build_challenge_prompt,
 )
 from apps.ai.prompts.structure_idea import (
-    SYSTEM_PROMPT,
-    build_prompt as build_structure_prompt,
+SYSTEM_PROMPT,
+build_prompt as build_structure_prompt,
 )
 
 
 def get_ai_provider() -> AIProvider:
-
     provider_name = os.getenv(
-        "AI_PROVIDER",
-        "mock",
+    "AI_PROVIDER",
+    "mock",
     ).lower()
 
     if provider_name == "ollama":
@@ -51,8 +51,7 @@ def get_ai_provider() -> AIProvider:
 
         if not api_key:
             raise RuntimeError(
-                "GEMINI_API_KEY est obligatoire "
-                "pour utiliser Gemini."
+                "GEMINI_API_KEY est obligatoire pour utiliser Gemini."
             )
 
         return GeminiProvider(
@@ -66,194 +65,26 @@ def get_ai_provider() -> AIProvider:
     return MockAIProvider()
 
 
-def get_ai_provider() -> AIProvider:
-    return MockAIProvider()
-
-
 def summarize(content: str) -> dict:
     provider = get_ai_provider()
 
-    return provider.summarize(content)
-
-
-def summarize_idea(idea) -> dict:
-    provider = get_ai_provider()
-
-    content = build_idea_context(idea)
-
     return provider.summarize(
         content=content,
     )
-
-
-def build_idea_context(idea) -> str:
-    parts = []
-
-    parts.append(f"# Idée\n{idea.title}")
-
-    if idea.description:
-        parts.append(
-            f"# Description\n{idea.description}"
-        )
-
-    if idea.problem:
-        parts.append(
-            f"# Problème\n{idea.problem}"
-        )
-
-    if idea.solution:
-        parts.append(
-            f"# Solution\n{idea.solution}"
-        )
-
-    if idea.target:
-        parts.append(
-            f"# Cible\n{idea.target}"
-        )
-
-    researches = ResearchItem.objects.filter(
-        idea=idea,
-        user=idea.user,
-    ).order_by("created_at")
-
-    if researches.exists():
-        research_parts = ["# Recherches"]
-
-        for research in researches:
-            research_parts.append(
-                f"## {research.title}\n"
-                f"{research.content}"
-            )
-
-        parts.append("\n".join(research_parts))
-
-    conversations = Conversation.objects.filter(
-        idea=idea,
-        user=idea.user,
-    ).order_by("created_at")
-
-    if conversations.exists():
-        conversation_parts = ["# Conversations"]
-
-        for conversation in conversations:
-            conversation_parts.append(
-                f"## {conversation.title}\n"
-                f"{conversation.content}"
-            )
-
-            if conversation.summary:
-                conversation_parts.append(
-                    f"Résumé : {conversation.summary}"
-                )
-
-        parts.append("\n".join(conversation_parts))
-
-    return "\n\n".join(parts)
-
-
-def get_ai_provider() -> AIProvider:
-    return MockAIProvider()
-
-
-def build_idea_context(idea) -> str:
-    parts = []
-
-    parts.append(f"# Idée\n{idea.title}")
-
-    if idea.description:
-        parts.append(
-            f"# Description\n{idea.description}"
-        )
-
-    if idea.problem:
-        parts.append(
-            f"# Problème\n{idea.problem}"
-        )
-
-    if idea.solution:
-        parts.append(
-            f"# Solution\n{idea.solution}"
-        )
-
-    if idea.target:
-        parts.append(
-            f"# Cible\n{idea.target}"
-        )
-
-    researches = ResearchItem.objects.filter(
-        idea=idea,
-        user=idea.user,
-    ).order_by("created_at")
-
-    if researches.exists():
-        research_parts = ["# Recherches"]
-
-        for research in researches:
-            research_parts.append(
-                f"## {research.title}\n"
-                f"{research.content}"
-            )
-
-        parts.append(
-            "\n".join(research_parts)
-        )
-
-    conversations = Conversation.objects.filter(
-        idea=idea,
-        user=idea.user,
-    ).order_by("created_at")
-
-    if conversations.exists():
-        conversation_parts = ["# Conversations"]
-
-        for conversation in conversations:
-            conversation_parts.append(
-                f"## {conversation.title}\n"
-                f"{conversation.content}"
-            )
-
-            if conversation.summary:
-                conversation_parts.append(
-                    f"Résumé : {conversation.summary}"
-                )
-
-        parts.append(
-            "\n".join(conversation_parts)
-        )
-
-    return "\n\n".join(parts)
-
-
-def summarize(
-    *,
-    content: str,
-) -> dict:
-    provider = get_ai_provider()
-
-    return provider.summarize(
-        content=content,
-    )
-
-
-def summarize_idea(idea) -> dict:
-    provider = get_ai_provider()
-
-    content = build_idea_context(idea)
-
-    return provider.summarize(
-        content=content,
-    )
-
 
 def chat_with_idea(
     *,
     idea,
     messages: list[dict[str, str]],
+    provider=None,
 ) -> str:
+    if provider is None:
+        provider = get_ai_provider()
 
-    provider = get_ai_provider()
-
-    context = build_idea_context(idea)
+    context = build_idea_context(
+        idea=idea,
+        user=idea.user,
+    )
 
     return provider.chat(
         context=context,
@@ -261,7 +92,16 @@ def chat_with_idea(
     )
 
 
-def structure_idea(*, idea, provider) -> dict:
+def structure_idea(
+    *,
+    idea,
+    provider,
+) -> dict:
+    context = build_idea_context(
+        idea=idea,
+        user=idea.user,
+    )
+
     user_prompt = build_structure_prompt(
         title=idea.title,
         description=idea.description,
@@ -269,6 +109,7 @@ def structure_idea(*, idea, provider) -> dict:
         solution=idea.solution,
         target=idea.target,
         next_action=idea.next_action,
+        context=context,
     )
 
     raw_result = provider.generate(
@@ -287,29 +128,27 @@ def structure_idea(*, idea, provider) -> dict:
         raise ValueError(
             "La réponse IA doit être un objet JSON."
         )
-    
-    context = build_idea_context(
-    idea=idea,
-    user=idea.user,
-)
-    user_prompt = build_structure_prompt(
-        title=idea.title,
-        description=idea.description,
-        problem=idea.problem,
-        solution=idea.solution,
-        target=idea.target,
-        next_action=idea.next_action,
-        context=context,
-)
 
-   
-def challenge_idea(*, idea, provider) -> dict:
+    return result
+
+
+def challenge_idea(
+    *,
+    idea,
+    provider,
+) -> dict:
+    context = build_idea_context(
+        idea=idea,
+        user=idea.user,
+    )
+
     user_prompt = build_challenge_prompt(
         title=idea.title,
         description=idea.description,
         problem=idea.problem,
         solution=idea.solution,
         target=idea.target,
+        context=context,
     )
 
     raw_result = provider.generate(
@@ -329,16 +168,4 @@ def challenge_idea(*, idea, provider) -> dict:
             "La réponse IA doit être un objet JSON."
         )
 
-    context = build_idea_context(
-    idea=idea,
-    user=idea.user,
-)
-
-    user_prompt = build_challenge_prompt(
-        title=idea.title,
-        description=idea.description,
-        problem=idea.problem,
-        solution=idea.solution,
-        target=idea.target,
-        context=context,
-)
+    return result
