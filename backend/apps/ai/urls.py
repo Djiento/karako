@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     ApplyStructureView,
     ChallengeIdeaView,
+    GenerateAIActionsView,
     IdeaAIAnalysesView,
     IdeaChatHistoryView,
     IdeaChatSessionsView,
@@ -68,4 +69,11 @@ urlpatterns = [
         IdeaAIAnalysesView.as_view(),
         name="ai-idea-analyses",
     ),
+
+    # Generate AI Actions
+    path(
+    "ideas/<int:idea_id>/actions/generate/",
+    GenerateAIActionsView.as_view(),
+    name="ai-generate-actions",
+),
 ]

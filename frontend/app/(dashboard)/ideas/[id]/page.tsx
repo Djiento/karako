@@ -4,6 +4,8 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import ResearchSection from "@/components/ideas/ResearchSection";
+import IdeaAISection from "@/components/ai/IdeaAISection";
+
 import {
   ArrowLeft,
   Check,
@@ -793,8 +795,11 @@ export default function IdeaDetailPage() {
           false,
         )}
       </div>
+
+          <IdeaAISection ideaId={idea.id} />
         
           <ResearchSection ideaId={idea.id} />
+          
            
 
       {/* Informations */}

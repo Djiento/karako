@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from apps.ai.models import AIAnalysis
+from apps.ai.models import AIAction, AIAnalysis, AIChatSession
 
 
 
@@ -41,12 +41,50 @@ class AIChatMessageSerializer(serializers.Serializer):
     created_at = serializers.DateTimeField(read_only=True)
 
 
-class AIChatSessionSerializer(serializers.Serializer):
-    id = serializers.IntegerField(read_only=True)
-    idea = serializers.IntegerField(read_only=True)
-    title = serializers.CharField(read_only=True)
-    created_at = serializers.DateTimeField(read_only=True)
-    updated_at = serializers.DateTimeField(read_only=True)
+class AIChatSessionSerializer(serializers.ModelSerializer):
+    idea = serializers.PrimaryKeyRelatedField(
+        read_only=True,
+    )
+    user = serializers.PrimaryKeyRelatedField(
+        read_only=True,
+    )
+
+    class Meta:
+        model = AIChatSession
+        fields = [
+            "id",
+            "idea",
+            "user",
+            "title",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class AIActionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AIAction    
+        fields = [
+            "id",
+            "idea",
+            "user",
+            "action_type",
+            "title",
+            "description",
+            "payload",
+            "status",
+            "created_at",
+            "applied_at",
+        ]
+
+        read_only_fields = [
+            "id",
+            "idea",
+            "user",
+            "status",
+            "created_at",
+            "applied_at",
+        ]
 
 
 class AIActionSerializer(serializers.Serializer):

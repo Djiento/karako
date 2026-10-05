@@ -1,30 +1,27 @@
-import os
 import json
+import os
 
 from .providers.base import AIProvider
 from .providers.mock import MockAIProvider
-from apps.research.models import ResearchItem
-
-from apps.ai.context.builder import build_idea_context
-from apps.ai.prompts.chat import build_prompt as build_chat_prompt
-
-from apps.ai.prompts.summarize import (
-build_prompt as build_summary_prompt,
+from apps.ai.prompts.actions import (
+    SYSTEM_PROMPT as ACTIONS_SYSTEM_PROMPT,
+    build_prompt as build_actions_prompt,
 )
+from apps.ai.context.builder import build_idea_context
 from apps.ai.prompts.challenge_idea import (
-SYSTEM_PROMPT as CHALLENGE_SYSTEM_PROMPT,
-build_prompt as build_challenge_prompt,
+    SYSTEM_PROMPT as CHALLENGE_SYSTEM_PROMPT,
+    build_prompt as build_challenge_prompt,
 )
 from apps.ai.prompts.structure_idea import (
-SYSTEM_PROMPT,
-build_prompt as build_structure_prompt,
+    SYSTEM_PROMPT as STRUCTURE_SYSTEM_PROMPT,
+    build_prompt as build_structure_prompt,
 )
 
 
 def get_ai_provider() -> AIProvider:
     provider_name = os.getenv(
-    "AI_PROVIDER",
-    "mock",
+        "AI_PROVIDER",
+        "mock",
     ).lower()
 
     if provider_name == "ollama":
@@ -72,6 +69,21 @@ def summarize(content: str) -> dict:
         content=content,
     )
 
+
+def summarize_idea(*, idea, provider=None) -> dict:
+    if provider is None:
+        provider = get_ai_provider()
+
+    context = build_idea_context(
+        idea=idea,
+        user=idea.user,
+    )
+
+    return provider.summarize(
+        content=context,
+    )
+
+
 def chat_with_idea(
     *,
     idea,
@@ -113,7 +125,7 @@ def structure_idea(
     )
 
     raw_result = provider.generate(
-        system_prompt=SYSTEM_PROMPT,
+        system_prompt=STRUCTURE_SYSTEM_PROMPT,
         user_prompt=user_prompt,
     )
 
@@ -169,3 +181,81 @@ def challenge_idea(
         )
 
     return result
+
+
+def generate_ai_actions(
+    *,
+    idea,
+    provider,
+) -> list[dict]:
+    context = build_idea_context(
+        idea=idea,
+        user=idea.user,
+    )
+
+    user_prompt = build_actions_prompt(
+        context=context,
+    )
+
+    raw_result = provider.generate(
+        system_prompt=ACTIONS_SYSTEM_PROMPT,
+        user_prompt=user_prompt,
+    )
+
+    try:
+        result = json.loads(raw_result)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            "Le provider IA a retourné une réponse JSON invalide."
+        ) from exc
+
+    if not isinstance(result, dict):
+        raise ValueError(
+            "La réponse IA doit être un objet JSON."
+        )
+
+    actions = result.get("actions")
+
+    if not isinstance(actions, list):
+        raise ValueError(
+            "La réponse IA doit contenir une liste d'actions."
+        )
+
+    normalized_actions = []
+
+    allowed_types = {
+        "CREATE_TASK",
+        "CREATE_HYPOTHESIS",
+        "ADD_RESEARCH",
+        "UPDATE_IDEA",
+        "NEXT_STEP",
+    }
+
+    for action in actions:
+        if not isinstance(action, dict):
+            continue
+
+        action_type = action.get("action_type")
+        title = action.get("title")
+        description = action.get("description", "")
+        payload = action.get("payload", {})
+
+        if action_type not in allowed_types:
+            continue
+
+        if not title:
+            continue
+
+        if not isinstance(payload, dict):
+            payload = {}
+
+        normalized_actions.append(
+            {
+                "action_type": action_type,
+                "title": str(title).strip(),
+                "description": str(description).strip(),
+                "payload": payload,
+            }
+        )
+
+    return normalized_actions[:5]

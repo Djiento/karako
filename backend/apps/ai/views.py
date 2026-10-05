@@ -1,129 +1,239 @@
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from apps.validation.models import Hypothesis
+
 from apps.ideas.models import Idea
 from apps.ideas.serializers import IdeaSerializer
-from django.db import transaction
-from .models import AIAnalysis, AIAnalysisType
-from django.shortcuts import get_object_or_404
-from .models import AIChatMessage, AIChatSession
+from apps.validation.models import Hypothesis
+
+from .actions import apply_ai_action
+from .context.builder import build_idea_context
+from .models import (
+    AIAction,
+    AIAnalysis,
+    AIAnalysisType,
+    AIChatMessage,
+    AIChatSession,
+)
+from .providers import get_ai_provider
 from .serializers import (
+    AIActionSerializer,
+    AIAnalysisSerializer,
     AIChatMessageSerializer,
     AIChatSessionSerializer,
-    ChatMessageSerializer,
     ApplyStructureSerializer,
-    StructureIdeaSerializer,
     ChallengeIdeaSerializer,
-    AIAnalysisSerializer,
-    AIActionSerializer)
-from .actions import apply_ai_action
-from .models import AIAction
-from .providers import get_ai_provider
-from .services import chat_with_idea
+    ChatMessageSerializer,
+    StructureIdeaSerializer,
+)
+from .services import (
+    challenge_idea,
+    chat_with_idea,
+    structure_idea,
+    summarize_idea,
+    generate_ai_actions,
+)
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 
-
+# ============================================================
+# STRUCTURE
+# ============================================================
 
 class StructureIdeaView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @transaction.atomic
     def post(self, request, idea_id):
-
-        try:
-            idea = Idea.objects.get(
-                id=idea_id,
-                user=request.user,
-            )
-        except Idea.DoesNotExist:
-            return Response(
-                {"detail": "Idée introuvable."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        result = structure_idea(
-            title=idea.title,
-            description=idea.description,
+        idea = get_object_or_404(
+            Idea,
+            id=idea_id,
+            user=request.user,
         )
 
-        AIAnalysis.objects.create(
-            idea=idea,
-            user=request.user,
-            analysis_type=AIAnalysisType.STRUCTURE,
-            input_context=(
-                f"Title: {idea.title}\n"
-                f"Description: {idea.description}"
-            ),
-            result=result,
-            provider="mock",
-)
+        try:
+            provider = get_ai_provider()
 
-        return Response(result)
+            result = structure_idea(
+                idea=idea,
+                provider=provider,
+            )
+
+            serializer = StructureIdeaSerializer(
+                data=result,
+            )
+
+            if not serializer.is_valid():
+                return Response(
+                    {
+                        "detail": "La réponse IA ne respecte pas le format attendu.",
+                        "errors": serializer.errors,
+                    },
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+
+            context = build_idea_context(
+                idea=idea,
+                user=request.user,
+            )
+
+            analysis = AIAnalysis.objects.create(
+                idea=idea,
+                user=request.user,
+                analysis_type=AIAnalysisType.STRUCTURE,
+                input_context=context,
+                result=serializer.validated_data,
+                provider=provider.__class__.__name__,
+            )
+
+            return Response(
+                {
+                    "idea_id": idea.id,
+                    "analysis_type": AIAnalysisType.STRUCTURE,
+                    "provider": analysis.provider,
+                    "result": serializer.data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except ValueError as exc:
+            logger.exception(
+                "AI STRUCTURE VALIDATION ERROR - idea=%s",
+                idea.id,
+            )
+
+            return Response(
+                {
+                    "detail": str(exc),
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        except Exception as exc:
+            logger.exception(
+                "AI STRUCTURE ERROR - idea=%s",
+                idea.id,
+            )
+
+            return Response(
+                {
+                    "detail": (
+                        "Une erreur est survenue "
+                        "pendant la structuration."
+                    ),
+                    "error": str(exc),
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+# ============================================================
+# APPLY STRUCTURE
+# ============================================================
+
 
 class ApplyStructureView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request, idea_id):
-        try:
-            idea = Idea.objects.get(
-                id=idea_id,
-                user=request.user,
-            )
-        except Idea.DoesNotExist:
-            return Response(
-                {"detail": "Idée introuvable."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        data = request.data
-
-        serializer = StructureIdeaSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-
-        validated = serializer.validated_data
-
-        idea.problem = validated.get("problem", idea.problem)
-        idea.solution = validated.get("solution", idea.solution)
-        idea.target = validated.get("target", idea.target)
-        idea.next_action = validated.get("next_action", idea.next_action)
-
-        idea.save(
-            update_fields=[
-                "problem",
-                "solution",
-                "target",
-                "next_action",
-                "updated_at",
-            ]
+        idea = get_object_or_404(
+            Idea,
+            id=idea_id,
+            user=request.user,
         )
+
+        serializer = ApplyStructureSerializer(
+            data=request.data,
+        )
+
+        serializer.is_valid(
+            raise_exception=True,
+        )
+
+        data = serializer.validated_data
+
+        update_fields = []
+
+        for field in (
+            "problem",
+            "solution",
+            "target",
+            "next_action",
+        ):
+            if field in data:
+                setattr(
+                    idea,
+                    field,
+                    data[field],
+                )
+
+                update_fields.append(field)
+
+        if update_fields:
+            idea.status = "UNDERSTANDING"
+
+            update_fields.append("status")
+            update_fields.append("updated_at")
+
+            idea.save(
+                update_fields=update_fields,
+            )
+
+        hypotheses_created = []
+
+        for statement in data.get(
+            "hypotheses",
+            [],
+        ):
+            hypothesis = Hypothesis.objects.create(
+                idea=idea,
+                user=request.user,
+                statement=statement,
+            )
+
+            hypotheses_created.append(
+                {
+                    "id": hypothesis.id,
+                    "statement": hypothesis.statement,
+                    "status": hypothesis.status,
+                }
+            )
 
         return Response(
             {
                 "idea": IdeaSerializer(
                     idea,
-                    context={"request": request},
+                    context={
+                        "request": request,
+                    },
                 ).data,
+                "hypotheses_created": hypotheses_created,
             },
             status=status.HTTP_200_OK,
         )
+
+
+# ============================================================
+# AI ANALYSES HISTORY
+# ============================================================
+
 
 class IdeaAIAnalysesView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, idea_id):
-        try:
-            idea = Idea.objects.get(
-                id=idea_id,
-                user=request.user,
-            )
-        except Idea.DoesNotExist:
-            return Response(
-                {"detail": "Idée introuvable."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        idea = get_object_or_404(
+            Idea,
+            id=idea_id,
+            user=request.user,
+        )
 
         analyses = (
             AIAnalysis.objects
@@ -144,20 +254,85 @@ class IdeaAIAnalysesView(APIView):
             status=status.HTTP_200_OK,
         )
 
+
+# ============================================================
+# ACTION AI
+# ============================================================
+
+class GenerateAIActionsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, idea_id):
+        idea = get_object_or_404(
+            Idea,
+            id=idea_id,
+            user=request.user,
+        )
+
+        provider = get_ai_provider()
+
+        try:
+            generated_actions = generate_ai_actions(
+                idea=idea,
+                provider=provider,
+            )
+
+        except ValueError as exc:
+            return Response(
+                {
+                    "detail": str(exc),
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        except Exception as exc:
+            return Response(
+                {
+                    "detail": (
+                        "Une erreur est survenue "
+                        "pendant la génération des actions."
+                    ),
+                    "error": str(exc),
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        created_actions = []
+
+        for action_data in generated_actions:
+            action = AIAction.objects.create(
+                idea=idea,
+                user=request.user,
+                action_type=action_data["action_type"],
+                title=action_data["title"],
+                description=action_data["description"],
+                payload=action_data["payload"],
+            )
+
+            created_actions.append(action)
+
+        return Response(
+            AIActionSerializer(
+                created_actions,
+                many=True,
+            ).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+# ============================================================
+# CHALLENGE
+# ============================================================
+
+
 class ChallengeIdeaView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, idea_id):
-        try:
-            idea = Idea.objects.get(
-                id=idea_id,
-                user=request.user,
-            )
-        except Idea.DoesNotExist:
-            return Response(
-                {"detail": "Idée introuvable."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        idea = get_object_or_404(
+            Idea,
+            id=idea_id,
+            user=request.user,
+        )
 
         provider = get_ai_provider()
 
@@ -166,33 +341,45 @@ class ChallengeIdeaView(APIView):
                 idea=idea,
                 provider=provider,
             )
+
         except ValueError as exc:
             return Response(
-                {"detail": str(exc)},
+                {
+                    "detail": str(exc),
+                },
                 status=status.HTTP_502_BAD_GATEWAY,
             )
-        except Exception:
+
+        except Exception as exc:
             return Response(
                 {
                     "detail": (
-                        "Une erreur est survenue pendant "
-                        "l'analyse de l'idée."
-                    )
+                        "Une erreur est survenue "
+                        "pendant l'analyse de l'idée."
+                    ),
+                    "error": str(exc),
                 },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                status=status.HTTP_502_BAD_GATEWAY,
             )
 
-        serializer = ChallengeIdeaSerializer(data=result)
-        serializer.is_valid(raise_exception=True)
+        serializer = ChallengeIdeaSerializer(
+            data=result,
+        )
+
+        serializer.is_valid(
+            raise_exception=True,
+        )
+
+        context = build_idea_context(
+            idea=idea,
+            user=request.user,
+        )
 
         AIAnalysis.objects.create(
             idea=idea,
             user=request.user,
             analysis_type=AIAnalysisType.CHALLENGE,
-            input_context=(
-                f"Titre : {idea.title}\n\n"
-                f"Description : {idea.description}"
-            ),
+            input_context=context,
             result=serializer.validated_data,
             provider=provider.name,
         )
@@ -207,128 +394,86 @@ class ChallengeIdeaView(APIView):
             status=status.HTTP_200_OK,
         )
 
-class ApplyStructureView(APIView):
-    permission_classes = [IsAuthenticated]
 
-    def post(self, request, idea_id):
-        try:
-            idea = Idea.objects.get(
-                id=idea_id,
-                user=request.user,
-            )
-        except Idea.DoesNotExist:
-            return Response(
-                {"detail": "Idée introuvable."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+# ============================================================
+# SUMMARY
+# ============================================================
 
-        serializer = ApplyStructureSerializer(
-            data=request.data,
-        )
 
-        serializer.is_valid(raise_exception=True)
-
-        data = serializer.validated_data
-
-        update_fields = []
-
-        for field in [
-            "problem",
-            "solution",
-            "target",
-            "next_action",
-        ]:
-            if field in data:
-                setattr(
-                    idea,
-                    field,
-                    data[field],
-                )
-                update_fields.append(field)
-
-        if update_fields:
-            idea.status = "UNDERSTANDING"
-            update_fields.append("status")
-
-            idea.save(
-                update_fields=[
-                    *update_fields,
-                    "updated_at",
-                ]
-            )
-
-        hypotheses_created = []
-
-        for statement in data.get("hypotheses", []):
-            hypothesis = Hypothesis.objects.create(
-                idea=idea,
-                user=request.user,
-                statement=statement,
-            )
-
-            hypotheses_created.append(
-                {
-                    "id": hypothesis.id,
-                    "statement": hypothesis.statement,
-                    "status": hypothesis.status,
-                }
-            )
-
-        return Response(
-            {
-                "idea": {
-                    "id": idea.id,
-                    "title": idea.title,
-                    "status": idea.status,
-                    "problem": idea.problem,
-                    "solution": idea.solution,
-                    "target": idea.target,
-                    "next_action": idea.next_action,
-                },
-                "hypotheses_created": hypotheses_created,
-            },
-            status=status.HTTP_200_OK,
-        )
 class SummarizeIdeaView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, idea_id):
+        idea = get_object_or_404(
+            Idea,
+            id=idea_id,
+            user=request.user,
+        )
+
+        provider = get_ai_provider()
 
         try:
-            idea = Idea.objects.get(
-                id=idea_id,
-                user=request.user,
-            )
-        except Idea.DoesNotExist:
-            return Response(
-                {"detail": "Idée introuvable."},
-                status=status.HTTP_404_NOT_FOUND,
+            result = summarize_idea(
+                idea=idea,
+                provider=provider,
             )
 
-       
-        result = summarize_idea(idea)
+        except ValueError as exc:
+            return Response(
+                {
+                    "detail": str(exc),
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        except Exception as exc:
+            return Response(
+                {
+                    "detail": (
+                        "Une erreur est survenue "
+                        "pendant le résumé de l'idée."
+                    ),
+                    "error": str(exc),
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        context = build_idea_context(
+            idea=idea,
+            user=request.user,
+        )
 
         AIAnalysis.objects.create(
             idea=idea,
             user=request.user,
             analysis_type=AIAnalysisType.SUMMARY,
-            input_context=build_idea_context(idea),
+            input_context=context,
             result=result,
-            provider="mock",
+            provider=provider.name,
         )
 
-        return Response(result)
+        return Response(
+            result,
+            status=status.HTTP_200_OK,
+        )
+
+
+# ============================================================
+# CHAT IA
+# ============================================================
+
 
 class IdeaChatView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, idea_id):
-
         serializer = ChatMessageSerializer(
-            data=request.data
+            data=request.data,
         )
 
-        serializer.is_valid(raise_exception=True)
+        serializer.is_valid(
+            raise_exception=True,
+        )
 
         idea = get_object_or_404(
             Idea,
@@ -336,7 +481,9 @@ class IdeaChatView(APIView):
             user=request.user,
         )
 
-        session_id = request.data.get("session_id")
+        session_id = request.data.get(
+            "session_id",
+        )
 
         if session_id:
             session = get_object_or_404(
@@ -379,10 +526,23 @@ class IdeaChatView(APIView):
             }
         )
 
-        assistant_content = chat_with_idea(
-            idea=idea,
-            messages=messages,
-        )
+        try:
+            assistant_content = chat_with_idea(
+                idea=idea,
+                messages=messages,
+            )
+
+        except Exception as exc:
+            return Response(
+                {
+                    "detail": (
+                        "Une erreur est survenue "
+                        "pendant la conversation avec l'IA."
+                    ),
+                    "error": str(exc),
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
 
         assistant_message = AIChatMessage.objects.create(
             session=session,
@@ -390,32 +550,45 @@ class IdeaChatView(APIView):
             content=assistant_content,
         )
 
-        session.save(update_fields=["updated_at"])
+        session.save(
+            update_fields=[
+                "updated_at",
+            ]
+        )
 
         return Response(
             {
                 "session_id": session.id,
                 "message": AIChatMessageSerializer(
-                    assistant_message
+                    assistant_message,
                 ).data,
             },
             status=status.HTTP_200_OK,
         )
 
+
+# ============================================================
+# CHAT SESSIONS
+# ============================================================
+
+
 class IdeaChatSessionsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, idea_id):
-
         idea = get_object_or_404(
             Idea,
             id=idea_id,
             user=request.user,
         )
 
-        sessions = AIChatSession.objects.filter(
-            idea=idea,
-            user=request.user,
+        sessions = (
+            AIChatSession.objects
+            .filter(
+                idea=idea,
+                user=request.user,
+            )
+            .order_by("-updated_at")
         )
 
         serializer = AIChatSessionSerializer(
@@ -423,14 +596,26 @@ class IdeaChatSessionsView(APIView):
             many=True,
         )
 
-        return Response(serializer.data)
+        return Response(
+            serializer.data,
+            status=status.HTTP_200_OK,
+        )
+
+
+# ============================================================
+# CHAT HISTORY
+# ============================================================
 
 
 class IdeaChatHistoryView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, idea_id, session_id):
-
+    def get(
+        self,
+        request,
+        idea_id,
+        session_id,
+    ):
         idea = get_object_or_404(
             Idea,
             id=idea_id,
@@ -444,55 +629,74 @@ class IdeaChatHistoryView(APIView):
             user=request.user,
         )
 
-        messages = session.messages.all()
-
-        serializer = AIChatMessageSerializer(
-            messages,
-            many=True,
+        messages = session.messages.order_by(
+            "created_at",
         )
 
         return Response(
             {
                 "session": AIChatSessionSerializer(
-                    session
+                    session,
                 ).data,
-                "messages": serializer.data,
-            }
+                "messages": AIChatMessageSerializer(
+                    messages,
+                    many=True,
+                ).data,
+            },
+            status=status.HTTP_200_OK,
         )
+
+
+# ============================================================
+# AI ACTIONS
+# ============================================================
+
 
 class IdeaAIActionsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, idea_id):
-
         idea = get_object_or_404(
             Idea,
             id=idea_id,
             user=request.user,
         )
 
-        actions = AIAction.objects.filter(
-            idea=idea,
-            user=request.user,
+        actions = (
+            AIAction.objects
+            .filter(
+                idea=idea,
+                user=request.user,
+            )
+            .order_by("-created_at")
+        )
+
+        serializer = AIActionSerializer(
+            actions,
+            many=True,
         )
 
         return Response(
-            AIActionSerializer(
-                actions,
-                many=True,
-            ).data
+            serializer.data,
+            status=status.HTTP_200_OK,
         )
+
+
+# ============================================================
+# APPLY AI ACTION
+# ============================================================
+
 
 class ApplyAIActionView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic
     def post(
         self,
         request,
         idea_id,
         action_id,
     ):
-
         action = get_object_or_404(
             AIAction,
             id=action_id,
@@ -511,7 +715,6 @@ class ApplyAIActionView(APIView):
             ValueError,
             KeyError,
         ) as exc:
-
             return Response(
                 {
                     "detail": str(exc),
@@ -522,7 +725,7 @@ class ApplyAIActionView(APIView):
         return Response(
             {
                 "action": AIActionSerializer(
-                    action
+                    action,
                 ).data,
                 "result": {
                     "id": result.id,
@@ -530,74 +733,3 @@ class ApplyAIActionView(APIView):
             },
             status=status.HTTP_200_OK,
         )
-
-class StructureIdeaView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, idea_id):
-        try:
-            idea = Idea.objects.get(
-                id=idea_id,
-                user=request.user,
-            )
-        except Idea.DoesNotExist:
-            return Response(
-                {
-                    "detail": "Idée introuvable."
-                },
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        provider = get_ai_provider()
-
-        try:
-            result = structure_idea(
-                idea=idea,
-                provider=provider,
-            )
-        except ValueError as exc:
-            return Response(
-                {
-                    "detail": str(exc)
-                },
-                status=status.HTTP_502_BAD_GATEWAY,
-            )
-        except Exception as exc:
-            return Response(
-                {
-                    "detail": (
-                        "Une erreur est survenue "
-                        "pendant la structuration."
-                    )
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-        serializer = StructureIdeaSerializer(
-            data=result
-        )
-        serializer.is_valid(raise_exception=True)
-
-        AIAnalysis.objects.create(
-            idea=idea,
-            user=request.user,
-            analysis_type=AIAnalysisType.STRUCTURE,
-            input_context=(
-                f"Titre : {idea.title}\n\n"
-                f"Description : {idea.description}"
-            ),
-            result=serializer.validated_data,
-            provider=provider.name,
-        )
-
-        return Response(
-            {
-                "idea_id": idea.id,
-                "analysis_type": AIAnalysisType.STRUCTURE,
-                "provider": provider.name,
-                "result": serializer.validated_data,
-            },
-            status=status.HTTP_200_OK,
-        )
-
-    

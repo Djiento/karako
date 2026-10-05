@@ -98,39 +98,65 @@ class AIActionStatus(models.TextChoices):
 
 
 class AIAction(models.Model):
+    class ActionType(models.TextChoices):
+        CREATE_TASK = "CREATE_TASK", "Créer une tâche"
+        CREATE_HYPOTHESIS = "CREATE_HYPOTHESIS", "Créer une hypothèse"
+        ADD_RESEARCH = "ADD_RESEARCH", "Ajouter une recherche"
+        UPDATE_IDEA = "UPDATE_IDEA", "Mettre à jour l'idée"
+        NEXT_STEP = "NEXT_STEP", "Définir une prochaine étape"
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "En attente"
+        APPLIED = "APPLIED", "Appliquée"
+        DISMISSED = "DISMISSED", "Ignorée"
+
     idea = models.ForeignKey(
         "ideas.Idea",
         on_delete=models.CASCADE,
         related_name="ai_actions",
     )
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="ai_actions",
     )
+
     action_type = models.CharField(
-        max_length=40,
-        choices=AIActionType.choices,
+        max_length=50,
+        choices=ActionType.choices,
     )
-    title = models.CharField(max_length=255)
-    payload = models.JSONField(default=dict)
+
+    title = models.CharField(
+        max_length=255,
+    )
+
+    description = models.TextField(
+        blank=True,
+    )
+
+    payload = models.JSONField(
+        default=dict,
+        blank=True,
+    )
+
     status = models.CharField(
         max_length=20,
-        choices=AIActionStatus.choices,
-        default=AIActionStatus.PROPOSED,
+        choices=Status.choices,
+        default=Status.PENDING,
     )
-    source_analysis = models.ForeignKey(
-        "ai.AIAnalysis",
-        on_delete=models.SET_NULL,
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    applied_at = models.DateTimeField(
         null=True,
         blank=True,
-        related_name="actions",
     )
-    created_at = models.DateTimeField(auto_now_add=True)
-    applied_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        ordering = ["-created_at"]
+        ordering = ["status", "-created_at"]
 
     def __str__(self):
         return self.title

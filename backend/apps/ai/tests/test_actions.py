@@ -1,63 +1,88 @@
+import json
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from apps.ai.actions import apply_ai_action
-from apps.ai.models import (
-    AIAction,
-    AIActionStatus,
-    AIActionType,
-)
+from apps.ai.models import AIAction
+from apps.ai.services import generate_ai_actions
 from apps.ideas.models import Idea
 
 
 User = get_user_model()
 
 
-class AIActionTests(TestCase):
+class FakeAIProvider:
+    name = "test"
 
+    def generate(
+        self,
+        *,
+        system_prompt,
+        user_prompt,
+    ):
+        return json.dumps(
+            {
+                "actions": [
+                    {
+                        "action_type": "CREATE_TASK",
+                        "title": "Interviewer trois utilisateurs",
+                        "description": (
+                            "Identifier trois utilisateurs potentiels "
+                            "et recueillir leurs besoins."
+                        ),
+                        "payload": {},
+                    },
+                    {
+                        "action_type": "CREATE_HYPOTHESIS",
+                        "title": "Vérifier le besoin utilisateur",
+                        "description": (
+                            "Les utilisateurs rencontrent réellement "
+                            "le problème identifié."
+                        ),
+                        "payload": {
+                            "statement": (
+                                "Les utilisateurs rencontrent "
+                                "réellement ce problème."
+                            )
+                        },
+                    },
+                ]
+            }
+        )
+
+
+class AIActionsTests(TestCase):
     def setUp(self):
-
         self.user = User.objects.create_user(
             email="actions@test.com",
-            password="password123",
+            password="TestPassword123!",
         )
 
         self.idea = Idea.objects.create(
             user=self.user,
-            title="Test Idea",
+            title="Application de test",
+            description="Une idée de test.",
         )
 
-    def test_create_hypothesis_action(self):
+    def test_generate_ai_actions(self):
+        provider = FakeAIProvider()
 
-        action = AIAction.objects.create(
+        actions = generate_ai_actions(
             idea=self.idea,
-            user=self.user,
-            action_type=(
-                AIActionType.CREATE_HYPOTHESIS
-            ),
-            title="Tester le besoin",
-            payload={
-                "statement": (
-                    "Les utilisateurs ont réellement "
-                    "ce problème."
-                ),
-                "why_important": (
-                    "C'est l'hypothèse principale."
-                ),
-                "confidence": 50,
-            },
+            provider=provider,
         )
-
-        result = apply_ai_action(
-            action=action,
-            user=self.user,
-        )
-
-        self.assertIsNotNone(result)
-
-        action.refresh_from_db()
 
         self.assertEqual(
-            action.status,
-            AIActionStatus.APPLIED,
+            len(actions),
+            2,
+        )
+
+        self.assertEqual(
+            actions[0]["action_type"],
+            "CREATE_TASK",
+        )
+
+        self.assertEqual(
+            actions[1]["action_type"],
+            "CREATE_HYPOTHESIS",
         )
